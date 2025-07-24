@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      2.0.1
 // @description  Bot de automação para Bestiary Arena
-// @author       Phael & Gemini
+// @author       Ph
 // @match        https://bestiaryarena.com/*
 // @grant        none
 // ==/UserScript==
