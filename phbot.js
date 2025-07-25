@@ -1,16 +1,16 @@
 // ==UserScript==
 // @name         PHbot
 // @namespace    http://tampermonkey.net/
-// @version      2.0.1
+// @version      2.1.0
 // @description  Bot de automação para Bestiary Arena
-// @author       Ph
+// @author       Phael & Gemini
 // @match        https://bestiaryarena.com/*
 // @grant        none
 // ==/UserScript==
 
 (async function() {
     'use strict';
-    const botVersion = "2.0.1";
+    const botVersion = "2.1.0";
     let settings = {};
     const defaultSettings = {
         isPaused: true, isSellEnabled: false, isSqueezeEnabled: false, isStaminaEnabled: true,
@@ -50,7 +50,7 @@
 
             if (await checkAndUseStaminaIfNeeded()) { await sleep(1500); continue; }
             if (await handleItemActions()) { await sleep(1000); continue; }
-
+            
             await handleStartHunting();
 
             await sleep(1000);
@@ -62,14 +62,14 @@
             }
         }
     }
-
+    
     async function handleAutoConfig() {
         addToLog(" Procurando botão 'Autoconfigurar'...");
         const configBtn = findButtonByPartialText("Autoconfigurar");
         if (configBtn) { addToLog("✅ Botão 'Autoconfigurar' encontrado! Clicando..."); await clickAndSleep(configBtn, 1000); lastActionTimestamp = Date.now(); } 
         else { addToLog("❌ Botão 'Autoconfigurar' não encontrado na tela."); }
     }
-
+    
     async function handleItemActions() {
         const monsterPopup = document.querySelector('div[role="dialog"][data-state="open"]'); if (!monsterPopup) return false;
         if (monsterPopup.style.pointerEvents === 'none') { monsterPopup.style.pointerEvents = 'auto'; addToLog("💥 Campo de força do jogo desativado!"); }
@@ -88,9 +88,9 @@
         if (wasLogVisible) logPanel.classList.remove('hidden');
         return actionTaken;
     }
-
+    
     function getCurrentStamina() { const staminaContainer = document.querySelector('div[title="Stamina"]'); if (!staminaContainer) return -1; const currentStaminaEl = staminaContainer.querySelector("span > span:first-child"); if (!currentStaminaEl) return -1; return parseInt(currentStaminaEl.textContent, 10); }
-    async function checkAndUseStaminaIfNeeded() { if (!settings.isStaminaEnabled) return false; const currentStamina = getCurrentStamina(); if (currentStamina === -1 || currentStamina >= settings.staminaThreshold) return false; if (findRaritySpan(document.body)) return false; addToLog(`Stamina baixa (${currentStamina}). Usando poção...`); const staminaContainer = document.querySelector('div[title="Stamina"]'); if (staminaContainer) { await clickAndSleep(staminaContainer, 1200); const openDialogs = document.querySelectorAll('div[role="dialog"][data-state="open"]'); if (openDialogs.length === 0) { addToLog("❌ Janela de poção não abriu."); return false; } const potionPopup = openDialogs[openDialogs.length - 1]; let useOneBtn = findButtonByPartialText("Usar poção", potionPopup); if (useOneBtn) { addToLog("⚡️ Usando poção de stamina"); sendToDiscord({ title: '⚡ RELATÓRIO DE STAMINA ⚡', description: `Stamina baixa (${currentStamina})! Usando poção para continuar o farm.`, color: 3447003 }); await clickAndSleep(useOneBtn, 1000); stats.potions++; updateStatsDisplay(); lastActionTimestamp = Date.now(); stallAlertSent = false; let closePotionBtn = findButtonByText("Fechar", potionPopup); if (closePotionBtn) await clickAndSleep(closePotionBtn, 1000); await sleep(500); pressEscape(); await sleep(500); pressEscape(); addToLog("... Fechando janelas residuais com 'Esc' (x2)."); return true; } else { addToLog("❌ Nenhuma poção encontrada na janela."); let closeBtn = findButtonByText("Fechar", potionPopup); if (closeBtn) await clickAndSleep(closeBtn, 1000); } } return false; }
+    async function checkAndUseStaminaIfNeeded() { if (!settings.isStaminaEnabled) return false; const currentStamina = getCurrentStamina(); if (currentStamina === -1 || currentStamina >= settings.staminaThreshold) return false; if (findRaritySpan(document.body)) { return false; } addToLog(`Stamina baixa (${currentStamina}). Usando poção...`); const staminaContainer = document.querySelector('div[title="Stamina"]'); if (staminaContainer) { await clickAndSleep(staminaContainer, 1200); const openDialogs = document.querySelectorAll('div[role="dialog"][data-state="open"]'); if (openDialogs.length === 0) { addToLog("❌ Janela de poção não abriu."); return false; } const potionPopup = openDialogs[openDialogs.length - 1]; let useOneBtn = findButtonByPartialText("Usar poção", potionPopup); if (useOneBtn) { addToLog("⚡️ Usando poção de stamina"); sendToDiscord({ title: '⚡ RELATÓRIO DE STAMINA ⚡', description: `Stamina baixa (${currentStamina})! Usando poção para continuar o farm.`, color: 3447003 }); await clickAndSleep(useOneBtn, 1000); stats.potions++; updateStatsDisplay(); lastActionTimestamp = Date.now(); stallAlertSent = false; let closePotionBtn = findButtonByText("Fechar", potionPopup); if (closePotionBtn) await clickAndSleep(closePotionBtn, 1000); await sleep(500); pressEscape(); await sleep(500); pressEscape(); addToLog("... Fechando janelas residuais com 'Esc' (x2)."); return true; } else { addToLog("❌ Nenhuma poção encontrada na janela."); let closeBtn = findButtonByText("Fechar", potionPopup); if (closeBtn) await clickAndSleep(closeBtn, 1000); } } return false; }
     async function handleStartHunting() { if (document.querySelector('div[role="dialog"][data-state="open"]')) return; let startBtn = Array.from(document.querySelectorAll("button")).find(b => b.textContent.trim() === "Iniciar" && b.getAttribute("data-full") === "false"); if (startBtn) { addToLog("⚔️ Iniciando nova caçada"); await clickAndSleep(startBtn, 1500); stats.hunts++; updateStatsDisplay(); lastActionTimestamp = Date.now(); stallAlertSent = false; } }
     async function sendToDiscord(embedData) { if (!settings.webhookUrl || !settings.webhookUrl.trim().includes('/api/webhooks/')) { return; } const payload = { username: "PHbot Reporter", avatar_url: "https://i.imgur.com/8nL2n3S.png", embeds: [embedData] }; try { const response = await fetch(settings.webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); if (!response.ok) { addToLog(`❌ Erro no Discord: ${response.status} ${response.statusText}.`); } } catch (error) { console.error("PHbot: Erro ao enviar para o Discord:", error); addToLog("❌ Erro de rede. Verifique o console (F12) e possíveis AdBlockers."); } }
     function forcefulClick(element) { const eventSequence = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']; for (const eventType of eventSequence) { element.dispatchEvent(new PointerEvent(eventType, { bubbles: true, cancelable: true, view: window })); } }
@@ -163,82 +163,89 @@
             .theme-color-dot { width: 12px; height: 12px; border-radius: 50%; }
             @keyframes log-fade-in { from { opacity: 0; transform: translateX(-10px) } to { opacity: 1; transform: translateX(0) } }
         `;
-    const styleSheet = document.createElement("style"); styleSheet.innerText = allCSS; document.head.appendChild(styleSheet);
-    const icons = {
-        power: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M11,7V13H13V7H11Z" /></svg>`,
-        sell: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,4C11.45,4 11,4.45 11,5V7H13V5C13,4.45 12.55,4 12,4M5,11C4.45,11 4,11.45 4,12C4,12.55 4.45,13 5,13H7V11H5M17,11V13H19C19.55,13 20,12.55 20,12C20,11.45 19.55,11 19,11H17M11,17V19C11,19.55 11.45,20 12,20C12.55,20 13,19.55 13,19V17H11M12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8Z" /></svg>`,
-        squeeze: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6,2V8H6V8L2,5V5L6,2M18,2L22,5V5L18,8H18V2M11,2H13V22H11V2M2,16L6,19V19L6,13H6L2,16M18,13V19L22,16L18,13Z" /></svg>`,
-        stamina: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,21.5C8,21.5 8,15 8,15H16C16,15 16,21.5 12,21.5M15,13H9V14C9,14.69 9.28,15.32 9.7,15.78C9.89,16 10.35,16.47 11,16.82V19.23L7,20.58L7.5,21.5L12,20L16.5,21.5L17,20.58L13,19.23V16.82C13.65,16.47 14.11,16 14.3,15.78C14.72,15.32 15,14.69 15,14V13M12,2C14.76,2 17,4.24 17,7C17,9.76 14.76,12 12,12C9.24,12 7,9.76 7,7C7,4.24 9.24,2 12,2Z" /></svg>`,
-        minimize: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M20,14H4V10H20" /></svg>`,
-        maximize: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M4,14H20V16H4V14M4,8H20V10H4V8" /></svg>`,
-        settings: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" /></svg>`,
-        close: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></svg>`,
-        autoConfig: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z M14 7l3 3 M5 6v4 M19 14v4 M10 2v2 M7 8H3 M21 16h-4 M11 3H9" /></svg>`
-    };
-    const hud = newElement('div', { id: 'phbot-hud', className: settings.theme });
-    if (settings.isMinimized) hud.classList.add('minimized');
-    const wrapper = newElement('div', { className: 'phbot-wrapper' });
-    const settingsBtn = newElement('button', { className: 'phbot-window-btn', innerHTML: icons.settings });
-    const settingsMenu = newElement('div', { id: 'phbot-settings-menu' });
-    settingsBtn.onclick = (e) => { e.stopPropagation(); hud.classList.toggle('settings-visible'); };
-    document.addEventListener('click', () => hud.classList.remove('settings-visible'));
-    settingsMenu.addEventListener('click', (e) => e.stopPropagation());
-    const logPanel = newElement('div', { id: 'phbot-log-panel', className: settings.logVisible ? '' : 'hidden' });
-    const logMenuItem = newElement('div', { className: 'phbot-menu-item', textContent: 'Ver Log' });
-    logMenuItem.onclick = (e) => { e.stopPropagation(); logPanel.classList.toggle('hidden'); hud.classList.remove('settings-visible'); saveSettings(); };
-    const themesMenuItem = newElement('div', { className: 'phbot-menu-item' });
-    themesMenuItem.innerHTML = `<span>Temas</span><span class="submenu-arrow">></span>`;
-    const themesSubMenu = newElement('div', { id: 'phbot-themes-submenu' });
-    let themeMenuTimeout;
-    themesMenuItem.addEventListener('mouseenter', () => { clearTimeout(themeMenuTimeout); themesSubMenu.style.display = 'block'; });
-    themesMenuItem.addEventListener('mouseleave', () => { themeMenuTimeout = setTimeout(() => { themesSubMenu.style.display = 'none'; }, 200); });
-    themesSubMenu.addEventListener('mouseenter', () => clearTimeout(themeMenuTimeout));
-    themesSubMenu.addEventListener('mouseleave', () => { themeMenuTimeout = setTimeout(() => { themesSubMenu.style.display = 'none'; }, 200); });
-    const themes = { 'Classic': 'theme-classic', 'Stealth': 'theme-stealth', 'Cyberpunk': 'theme-cyberpunk', 'Hacker': 'theme-hacker', 'Ciano': 'theme-ciano' };
-    const applyTheme = (themeName) => { hud.className = themeName; logPanel.className = themeName + (logPanel.classList.contains('hidden') ? ' hidden' : ''); if(settings.isMinimized) hud.classList.add('minimized'); saveSettings(); };
-    for (const [name, className] of Object.entries(themes)) { const themeOption = newElement('div', { className: 'phbot-menu-item theme-swatch', innerHTML: `<div class="theme-color-dot"></div><span>${name}</span>` }); const tempDiv = newElement('div', {className: className, style:'display:none'}); document.body.appendChild(tempDiv); themeOption.querySelector('.theme-color-dot').style.backgroundColor = getComputedStyle(tempDiv).getPropertyValue('--theme-accent'); tempDiv.remove(); themeOption.onclick = (e) => { e.stopPropagation(); applyTheme(className); hud.classList.remove('settings-visible'); }; themesSubMenu.appendChild(themeOption); }
-    themesMenuItem.appendChild(themesSubMenu);
-    const webhookGroup = newElement('div', { className: 'phbot-control-group' }); webhookGroup.style.padding = '8px 12px'; webhookGroup.append( newElement('label', { className: 'phbot-label', textContent: 'URL do Webhook' }), newElement('input', { className: 'phbot-input', type: 'text', value: settings.webhookUrl, placeholder: 'Cole a URL aqui', onchange: (e) => { settings.webhookUrl = e.target.value; saveSettings(); } }), newElement('button', { className: 'phbot-button', textContent: 'Testar Conexão', style: 'margin-top: 4px;', onclick: () => { addToLog('Enviando teste para o Discord...'); sendToDiscord({ title: '✅ Conexão do PHbot', description: 'Se você está vendo esta mensagem, o webhook está funcionando!', color: 3066993 }); } }) );
-    const resetStatsBtn = newElement('div', { className: 'phbot-menu-item' });
-    resetStatsBtn.innerHTML = '<span>Resetar Estatísticas</span>';
-    resetStatsBtn.onclick = (e) => { e.stopPropagation(); resetStats(); hud.classList.remove('settings-visible'); };
-    settingsMenu.append(logMenuItem, themesMenuItem, newElement('div', {className:'phbot-divider'}), webhookGroup, newElement('div', {className:'phbot-divider'}), resetStatsBtn);
-    const windowControls = newElement('div', { className: 'phbot-window-controls' }); windowControls.append(settingsBtn, newElement('button', { id: 'phbot-min-btn', className: 'phbot-window-btn', innerHTML: icons.minimize }));
-    const header = newElement('div', { className: 'phbot-header' }); header.append(newElement('span', { className: 'phbot-title', textContent: `PHbot v${botVersion}` }), windowControls);
-    const minimizedBar = newElement('div', { className: 'phbot-minimized-bar' }); minimizedBar.append( newElement('span', { className: 'phbot-title', textContent: `PHbot`}), newElement('span', { id: 'phbot-min-status', className: `phbot-min-status ${!settings.isPaused ? 'active' : ''}`, textContent: settings.isPaused ? 'Parado' : 'Em Execução' }), newElement('div', { className: 'phbot-window-controls', innerHTML: `<button id="phbot-max-btn" class="phbot-window-btn">${icons.maximize}</button>` }) );
-    const logHeader = newElement('div', { id: 'phbot-log-header' }); logHeader.append(newElement('span', { id: 'phbot-log-title', textContent: 'Log de Ações' }), newElement('button', { className: 'phbot-window-btn', innerHTML: icons.close, onclick: () => { logPanel.classList.add('hidden'); saveSettings(); } }));
-    logPanel.append(logHeader, newElement('div', { id: 'phbot-log-panel-content' }));
-    const createToggleButton = (text, icon, state, callback) => { const button = newElement("button", { className: "phbot-toggle" }); if (state) button.classList.add("active"); button.innerHTML = `${icon}<span>${text}</span><div class="toggle-icon"></div>`; button.onclick = () => { const newState = callback(); button.classList.toggle("active", newState); const s = document.getElementById('phbot-min-status'); s.textContent = newState ? "Em Execução" : "Parado"; s.classList.toggle('active', newState); saveSettings(); }; return button; };
-    const createActionButton = (text, icon, state, callback) => { const button = newElement("button", { className: "phbot-button" }); if (state) button.classList.add("active"); let currentText = state ? text.replace("Ativar", "Desativar") : text; button.innerHTML = `${icon}<span>${currentText}</span>`; button.onclick = () => { const newState = callback(); button.classList.toggle("active", newState); button.querySelector('span').textContent = text.replace("Ativar", newState ? "Desativar" : "Ativar"); saveSettings(); }; return button; };
-    const autoConfigBtn = newElement('button', { className: 'phbot-button' });
-    autoConfigBtn.innerHTML = `${icons.autoConfig}<span>Autoconfigurar</span>`;
-    autoConfigBtn.onclick = handleAutoConfig;
-    const staminaGroup = newElement('div', { className: 'phbot-control-group' });
-    staminaGroup.append(createActionButton("Ativar Stamina", icons.stamina, settings.isStaminaEnabled, () => { settings.isStaminaEnabled = !settings.isStaminaEnabled; return settings.isStaminaEnabled; }));
-    const staminaThresholdGroup = newElement('div', { className: 'phbot-control-group' }); staminaThresholdGroup.style.marginTop = '8px';
-    staminaThresholdGroup.append( newElement('label', { className: 'phbot-label', textContent: 'Usar poção abaixo de:' }), newElement('input', { className: 'phbot-input', type: "number", value: settings.staminaThreshold, min: 1, onchange: (e) => { let v = parseInt(e.target.value, 10); v=isNaN(v)?3:v; v=v<1?1:v; e.target.value=v; settings.staminaThreshold=v; saveSettings(); } }) );
-    staminaGroup.append(staminaThresholdGroup);
-    const sellGroup = newElement('div', { className: 'phbot-control-group' }); sellGroup.append(newElement('label', { className: 'phbot-label', textContent: 'Vender itens abaixo de:' }), newElement('input', { className: 'phbot-input', type: "number", value: settings.sellRarityThreshold, min: 10, max: 79, onchange: (e) => { let v = parseInt(e.target.value, 10); v=isNaN(v)?79:v; v=v<10?10:v; v = v > 79 ? 79 : v; e.target.value=v; settings.sellRarityThreshold=v; saveSettings(); } }));
-    const statsPanel = newElement('div', { className: 'phbot-stats-panel' }); const statEntries = { 'Vendidos': 'phbot-stat-sold', 'Espremidos': 'phbot-stat-squeezed', 'Poções': 'phbot-stat-potions', 'Caçadas': 'phbot-stat-hunts', 'Atividade': 'phbot-stat-time' }; for (const [label, id] of Object.entries(statEntries)) { statsPanel.append( newElement('span', {className:'phbot-stat-label', textContent:label}), newElement('span', {className:'phbot-stat-value', id:id, textContent:(label === 'Atividade')?'00:00:00':'0'}) ); }
+        const styleSheet = document.createElement("style"); styleSheet.innerText = allCSS; document.head.appendChild(styleSheet);
+        const icons = {
+            power: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M11,7V13H13V7H11Z" /></svg>`,
+            sell: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,4C11.45,4 11,4.45 11,5V7H13V5C13,4.45 12.55,4 12,4M5,11C4.45,11 4,11.45 4,12C4,12.55 4.45,13 5,13H7V11H5M17,11V13H19C19.55,13 20,12.55 20,12C20,11.45 19.55,11 19,11H17M11,17V19C11,19.55 11.45,20 12,20C12.55,20 13,19.55 13,19V17H11M12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8Z" /></svg>`,
+            squeeze: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6,2V8H6V8L2,5V5L6,2M18,2L22,5V5L18,8H18V2M11,2H13V22H11V2M2,16L6,19V19L6,13H6L2,16M18,13V19L22,16L18,13Z" /></svg>`,
+            stamina: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,21.5C8,21.5 8,15 8,15H16C16,15 16,21.5 12,21.5M15,13H9V14C9,14.69 9.28,15.32 9.7,15.78C9.89,16 10.35,16.47 11,16.82V19.23L7,20.58L7.5,21.5L12,20L16.5,21.5L17,20.58L13,19.23V16.82C13.65,16.47 14.11,16 14.3,15.78C14.72,15.32 15,14.69 15,14V13M12,2C14.76,2 17,4.24 17,7C17,9.76 14.76,12 12,12C9.24,12 7,9.76 7,7C7,4.24 9.24,2 12,2Z" /></svg>`,
+            minimize: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M20,14H4V10H20" /></svg>`,
+            maximize: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M4,14H20V16H4V14M4,8H20V10H4V8" /></svg>`,
+            settings: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z" /></svg>`,
+            close: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" /></svg>`,
+            autoConfig: `<svg viewBox="0 0 24 24"><path fill="currentColor" d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z M14 7l3 3 M5 6v4 M19 14v4 M10 2v2 M7 8H3 M21 16h-4 M11 3H9" /></svg>`
+        };
+        const hud = newElement('div', { id: 'phbot-hud', className: settings.theme });
+        if (settings.isMinimized) hud.classList.add('minimized');
+        const wrapper = newElement('div', { className: 'phbot-wrapper' });
+        const settingsBtn = newElement('button', { className: 'phbot-window-btn', innerHTML: icons.settings });
+        const settingsMenu = newElement('div', { id: 'phbot-settings-menu' });
+        settingsBtn.onclick = (e) => { e.stopPropagation(); hud.classList.toggle('settings-visible'); };
+        document.addEventListener('click', () => hud.classList.remove('settings-visible'));
+        settingsMenu.addEventListener('click', (e) => e.stopPropagation());
+        const logPanel = newElement('div', { id: 'phbot-log-panel', className: settings.logVisible ? '' : 'hidden' });
+        const logMenuItem = newElement('div', { className: 'phbot-menu-item', textContent: 'Ver Log' });
+        logMenuItem.onclick = (e) => { e.stopPropagation(); logPanel.classList.toggle('hidden'); hud.classList.remove('settings-visible'); saveSettings(); };
+        const themesMenuItem = newElement('div', { className: 'phbot-menu-item' });
+        themesMenuItem.innerHTML = `<span>Temas</span><span class="submenu-arrow">></span>`;
+        const themesSubMenu = newElement('div', { id: 'phbot-themes-submenu' });
+        let themeMenuTimeout;
+        themesMenuItem.addEventListener('mouseenter', () => { clearTimeout(themeMenuTimeout); themesSubMenu.style.display = 'block'; });
+        themesMenuItem.addEventListener('mouseleave', () => { themeMenuTimeout = setTimeout(() => { themesSubMenu.style.display = 'none'; }, 200); });
+        themesSubMenu.addEventListener('mouseenter', () => clearTimeout(themeMenuTimeout));
+        themesSubMenu.addEventListener('mouseleave', () => { themeMenuTimeout = setTimeout(() => { themesSubMenu.style.display = 'none'; }, 200); });
+        const themes = { 'Classic': 'theme-classic', 'Stealth': 'theme-stealth', 'Cyberpunk': 'theme-cyberpunk', 'Hacker': 'theme-hacker', 'Ciano': 'theme-ciano' };
+        const applyTheme = (themeName) => { hud.className = themeName; logPanel.className = themeName + (logPanel.classList.contains('hidden') ? ' hidden' : ''); if(settings.isMinimized) hud.classList.add('minimized'); saveSettings(); };
+        for (const [name, className] of Object.entries(themes)) { const themeOption = newElement('div', { className: 'phbot-menu-item theme-swatch', innerHTML: `<div class="theme-color-dot"></div><span>${name}</span>` }); const tempDiv = newElement('div', {className: className, style:'display:none'}); document.body.appendChild(tempDiv); themeOption.querySelector('.theme-color-dot').style.backgroundColor = getComputedStyle(tempDiv).getPropertyValue('--theme-accent'); tempDiv.remove(); themeOption.onclick = (e) => { e.stopPropagation(); applyTheme(className); hud.classList.remove('settings-visible'); }; themesSubMenu.appendChild(themeOption); }
+        themesMenuItem.appendChild(themesSubMenu);
+        const webhookGroup = newElement('div', { className: 'phbot-control-group' });
+        webhookGroup.style.padding = '8px 12px';
+        webhookGroup.append(
+            newElement('label', { className: 'phbot-label', textContent: 'URL do Webhook' }),
+            newElement('input', { className: 'phbot-input', type: 'text', value: settings.webhookUrl, placeholder: 'Cole a URL aqui', onchange: (e) => { settings.webhookUrl = e.target.value; saveSettings(); } }),
+            newElement('button', { className: 'phbot-button', textContent: 'Testar Conexão', style: 'margin-top: 4px;', onclick: () => { addToLog('Enviando teste para o Discord...'); sendToDiscord({ title: '✅ Conexão do PHbot', description: 'Se você está vendo esta mensagem, o webhook está funcionando!', color: 3066993 }); } })
+        );
+        const resetStatsBtn = newElement('div', { className: 'phbot-menu-item' });
+        resetStatsBtn.innerHTML = '<span>Resetar Estatísticas</span>';
+        resetStatsBtn.onclick = (e) => { e.stopPropagation(); resetStats(); hud.classList.remove('settings-visible'); };
+        settingsMenu.append(logMenuItem, themesMenuItem, newElement('div', {className:'phbot-divider'}), webhookGroup, newElement('div', {className:'phbot-divider'}), resetStatsBtn);
+        const windowControls = newElement('div', { className: 'phbot-window-controls' }); windowControls.append(settingsBtn, newElement('button', { id: 'phbot-min-btn', className: 'phbot-window-btn', innerHTML: icons.minimize }));
+        const header = newElement('div', { className: 'phbot-header' }); header.append(newElement('span', { className: 'phbot-title', textContent: `PHbot v${botVersion}` }), windowControls);
+        const minimizedBar = newElement('div', { className: 'phbot-minimized-bar' }); minimizedBar.append( newElement('span', { className: 'phbot-title', textContent: `PHbot`}), newElement('span', { id: 'phbot-min-status', className: `phbot-min-status ${!settings.isPaused ? 'active' : ''}`, textContent: settings.isPaused ? 'Parado' : 'Em Execução' }), newElement('div', { className: 'phbot-window-controls', innerHTML: `<button id="phbot-max-btn" class="phbot-window-btn">${icons.maximize}</button>` }) );
+        const logHeader = newElement('div', { id: 'phbot-log-header' }); logHeader.append(newElement('span', { id: 'phbot-log-title', textContent: 'Log de Ações' }), newElement('button', { className: 'phbot-window-btn', innerHTML: icons.close, onclick: () => { logPanel.classList.add('hidden'); saveSettings(); } }));
+        logPanel.append(logHeader, newElement('div', { id: 'phbot-log-panel-content' }));
+        const createToggleButton = (text, icon, state, callback) => { const button = newElement("button", { className: "phbot-toggle" }); if (state) button.classList.add("active"); button.innerHTML = `${icon}<span>${text}</span><div class="toggle-icon"></div>`; button.onclick = () => { const newState = callback(); button.classList.toggle("active", newState); const s = document.getElementById('phbot-min-status'); s.textContent = newState ? "Em Execução" : "Parado"; s.classList.toggle('active', newState); saveSettings(); }; return button; };
+        const createActionButton = (text, icon, state, callback) => { const button = newElement("button", { className: "phbot-button" }); if (state) button.classList.add("active"); let currentText = state ? text.replace("Ativar", "Desativar") : text; button.innerHTML = `${icon}<span>${currentText}</span>`; button.onclick = () => { const newState = callback(); button.classList.toggle("active", newState); button.querySelector('span').textContent = text.replace("Ativar", newState ? "Desativar" : "Ativar"); saveSettings(); }; return button; };
+        const autoConfigBtn = newElement('button', { className: 'phbot-button' });
+        autoConfigBtn.innerHTML = `${icons.autoConfig}<span>Autoconfigurar</span>`;
+        autoConfigBtn.onclick = handleAutoConfig;
+        const staminaGroup = newElement('div', { className: 'phbot-control-group' });
+        staminaGroup.append(createActionButton("Ativar Stamina", icons.stamina, settings.isStaminaEnabled, () => { settings.isStaminaEnabled = !settings.isStaminaEnabled; return settings.isStaminaEnabled; }));
+        const staminaThresholdGroup = newElement('div', { className: 'phbot-control-group' }); staminaThresholdGroup.style.marginTop = '8px';
+        staminaThresholdGroup.append( newElement('label', { className: 'phbot-label', textContent: 'Usar poção abaixo de:' }), newElement('input', { className: 'phbot-input', type: "number", value: settings.staminaThreshold, min: 1, onchange: (e) => { let v = parseInt(e.target.value, 10); v=isNaN(v)?3:v; v=v<1?1:v; e.target.value=v; settings.staminaThreshold=v; saveSettings(); } }) );
+        staminaGroup.append(staminaThresholdGroup);
+        const sellGroup = newElement('div', { className: 'phbot-control-group' }); sellGroup.append(newElement('label', { className: 'phbot-label', textContent: 'Vender itens abaixo de:' }), newElement('input', { className: 'phbot-input', type: "number", value: settings.sellRarityThreshold, min: 10, max: 79, onchange: (e) => { let v = parseInt(e.target.value, 10); v=isNaN(v)?79:v; v=v<10?10:v; v = v > 79 ? 79 : v; e.target.value=v; settings.sellRarityThreshold=v; saveSettings(); } }));
+        const statsPanel = newElement('div', { className: 'phbot-stats-panel' }); const statEntries = { 'Vendidos': 'phbot-stat-sold', 'Espremidos': 'phbot-stat-squeezed', 'Poções': 'phbot-stat-potions', 'Caçadas': 'phbot-stat-hunts', 'Atividade': 'phbot-stat-time' }; for (const [label, id] of Object.entries(statEntries)) { statsPanel.append( newElement('span', {className:'phbot-stat-label', textContent:label}), newElement('span', {className:'phbot-stat-value', id:id, textContent:(label === 'Atividade')?'00:00:00':'0'}) ); }
+        
+        wrapper.append(
+            header,
+            createToggleButton("Bot Ativo", icons.power, !settings.isPaused, () => { settings.isPaused = !settings.isPaused; return !settings.isPaused; }),
+            autoConfigBtn,
+            newElement('div', {className: 'phbot-divider'}),
+            createActionButton("Ativar Venda", icons.sell, settings.isSellEnabled, () => { settings.isSellEnabled = !settings.isSellEnabled; return settings.isSellEnabled; }),
+            sellGroup,
+            createActionButton("Ativar Espremer", icons.squeeze, settings.isSqueezeEnabled, () => { settings.isSqueezeEnabled = !settings.isSqueezeEnabled; return settings.isSqueezeEnabled; }),
+            staminaGroup,
+            newElement('div', {className: 'phbot-divider'}),
+            statsPanel
+        );
 
-    wrapper.append(
-        header,
-        createToggleButton("Bot Ativo", icons.power, !settings.isPaused, () => { settings.isPaused = !settings.isPaused; return !settings.isPaused; }),
-        autoConfigBtn,
-        newElement('div', {className: 'phbot-divider'}),
-        createActionButton("Ativar Venda", icons.sell, settings.isSellEnabled, () => { settings.isSellEnabled = !settings.isSellEnabled; return settings.isSellEnabled; }),
-        sellGroup,
-        createActionButton("Ativar Espremer", icons.squeeze, settings.isSqueezeEnabled, () => { settings.isSqueezeEnabled = !settings.isSqueezeEnabled; return settings.isSqueezeEnabled; }),
-        staminaGroup,
-        newElement('div', {className: 'phbot-divider'}),
-        statsPanel
-    );
-
-    hud.append(wrapper, minimizedBar, settingsMenu);
-    document.body.append(hud, logPanel);
-    document.getElementById('phbot-min-btn').onclick = () => { hud.classList.add('minimized'); saveSettings(); };
-    document.getElementById('phbot-max-btn').onclick = () => { hud.classList.remove('minimized'); saveSettings(); };
-
-    makeDraggable(hud, '.phbot-header, .phbot-minimized-bar');
-    makeDraggable(logPanel, '#phbot-log-header');}
+        hud.append(wrapper, minimizedBar, settingsMenu);
+        document.body.append(hud, logPanel);
+        document.getElementById('phbot-min-btn').onclick = () => { hud.classList.add('minimized'); saveSettings(); };
+        document.getElementById('phbot-max-btn').onclick = () => { hud.classList.remove('minimized'); saveSettings(); };
+        
+        makeDraggable(hud, '.phbot-header, .phbot-minimized-bar');
+        makeDraggable(logPanel, '#phbot-log-header');
+    }
 })();
